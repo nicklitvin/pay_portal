@@ -1,13 +1,10 @@
-import { getAmounts } from "@/lib/calculator"
+import { getTransactionFee } from "@/lib/calculator"
 
 describe("calculator", () => {
     it("should calculate", () => {
-        // basic
-        expect(getAmounts(100).amount).toEqual(100);
-        // expect(getAmounts(10).fee).toEqual(0.59);
-
-        // rounding
-        // expect(getAmounts(0.01).fee).toEqual(0.31);
-        // expect(getAmounts(10.01).fee).toEqual(0.32);
+        expect(getTransactionFee(10)).toEqual(0.61);
+        expect(getTransactionFee(10.01)).toEqual(0.61);
+        expect(getTransactionFee(0.01)).toEqual(0.31);
+        expect(getTransactionFee(1.99)).toEqual(0.37);
     })
 })

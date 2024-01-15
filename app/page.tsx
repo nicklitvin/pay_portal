@@ -2,123 +2,151 @@
 import axios from "axios"
 import { useEffect, useState } from "react"
 import toast from "react-hot-toast";
-import classNames from "classnames";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const text = {
-    notif_success_pay: "Payment completed successfully",
-    notif_fail_pay: "Did not complete payment",
-    notif_not_valid: "Enter a valid amount",
+    notif_pay_success: "Payment completed successfully",
+    notif_pay_error: "Did not complete payment",
+    notif_input_not_valid: "Enter a valid amount",
+    notif_input_not_enough: "Min. payment $0.20",
     notif_loading: "Loading...",
-    notify_sucess_link: "Generated Stripe Link",
-    notif_fail_link: "Error with Stripe Link",
-    notif_copy: "Copied Link",
+    notif_link_copied: "Copied Link to Clipboard",
+    notif_link_fail: "Server Error",
+    notif_url_amount_error: "Error with url amount",
 
-    title: "Stipe Link Generator",
+    title: "Osipova Payment Portal",
     subtitle: `
-        Enter a valid dollar amount and press generate to create a Stripe link.
-        Press on the copy button to add it to your clipboard and paste it anywhere.
+        Enter a dollar amount to pay to Osipova Ballet Academy 
+        Min. payment is $0.20
+        Transaction Fee is equal to 2.9% + $0.30
+
+        Generate Link will create a checkout page and copy the link to your clipboard
+        Complete payment will redirect you to the checkout page
     `,
-    generate: "Generate",
-    copy_link: "Copy Stripe Link for $",
-    go_to_pay: "Go to Payment Page"
+    generate_link: "Generate Link",
+    complete_pay: "Complete Payment"
 
 }
 
 export default function Home() {
     const router = useRouter();
     const searchParams = useSearchParams();
-
-    const [payAmount, setPayAmount] = useState<number>();
-    const [response, setResponse] = useState<{amount: number, url: string}>();
+    const [payAmount, setPayAmount] = useState<string>("");
+    const [redirecting, setRedirecting] = useState<boolean>(true);
 
     useEffect( () => {
-        const success = searchParams.get("success");
+        const checkAmount = async () => {
+            const amount = searchParams.get("amount");
 
-        if (success == "1") {
-            toast.success(text.notif_success_pay);
-        } else if (success == "0") {
-            toast.error(text.notif_fail_pay);
+            if (amount && isPayAmountValid(amount).valid) {
+                try {
+                    const response = await axios.get(`/api/getLinks?amount=${amount}`);
+                    if (response.data.url) {
+                        window.history.pushState({path: "/"},"","/");
+                        router.push(response.data.url);
+                    }
+                } catch (err) {
+                    toast.error(text.notif_link_fail)
+                }
+            } else if (amount) {
+                toast.error(text.notif_url_amount_error)
+            }
+            setRedirecting(false);
         }
-        window.history.pushState({path: "/"},"","/");
-        
+
+        const checkSuccess = async () => {
+            const success = searchParams.get("success");
+
+            if (success == "1") {
+                toast.success(text.notif_pay_success);
+            } else if (success == "0") {
+                toast.error(text.notif_pay_error);
+            }
+            window.history.pushState({path: "/"},"","/");
+        }
+
+        checkAmount();
+        checkSuccess();
     }, [])
 
-    const errorWithAmount = () => {
-        toast.error(text.notif_not_valid);
+    const isPayAmountValid = (amount : string)  => {
+        const result : {valid: boolean, message: string} = {
+            valid: true,
+            message: ""
+        }
+
+        const numberAmount = Number(amount);
+        
+        if (Number.isNaN(numberAmount)) {
+            result.valid = false;
+            result.message = text.notif_input_not_valid
+        } else if (numberAmount < 0.2) {
+            result.valid = false;
+            result.message = text.notif_input_not_enough;
+        } 
+
+        return result;
     }
 
-    const getLink = async () => {
-        if (!payAmount || payAmount < 0) 
-            return errorWithAmount()
-        
-        const amountSplit = payAmount?.toString().split('.');
 
-        if (amountSplit.length > 2 || (amountSplit.length == 2 && amountSplit[1].length > 2) )  
-            return errorWithAmount()
+    const generateLink = async (openLink : boolean) => {
+        const amountInfo = isPayAmountValid(payAmount);
 
-        toast.promise(
-            axios.get(`/api/getLinks?amount=${payAmount}`),
-            {
-                error: text.notif_fail_link,
-                loading: text.notif_loading,
-                success: (response) => {
-                    setResponse(response.data)
-                    return text.notify_sucess_link
+        if (!amountInfo.valid) 
+            return toast.error(amountInfo.message)
+
+        try {
+            await toast.promise(
+                axios.get(`/api/getLinks?amount=${payAmount}`),
+                {
+                    error: text.notif_link_fail,
+                    loading: text.notif_loading,
+                    success: (response) => {
+                        if (openLink) {
+                            router.push(response.data.url)
+                            return null
+                        } else {
+                            navigator.clipboard.writeText(response.data.url)
+                            return text.notif_link_copied
+                        }
+                    }
                 }
-            }
+            )
+        } catch (err) {}
+    }
+
+    if (redirecting) {
+        return (
+            <div className="bg-back w-full h-full justify-center items-center flex">
+                <h1 className="text-center font-bold text-4xl">{text.notif_loading}</h1>
+            </div>
+        )
+    } else {
+        return (
+            <div className="flex flex-col gap-5 justify-center items-center h-full bg-back">
+                <h1 className="text-4xl font-bold text-center">{text.title}</h1>
+                <p className="text-center w-3/5 whitespace-pre-line">{text.subtitle}</p>
+                <input
+                    type="number"
+                    placeholder="Enter $ Amount"
+                    className="p-3 text-center rounded-xl"
+                    onChange={(e) => setPayAmount(e.target.value)}
+                />
+                <div className="flex gap-3">
+                    <button 
+                        onClick={ () => generateLink(false)}
+                        className="bg-first p-3 text-white rounded-xl hover:brightness-75"
+                    >
+                        {text.generate_link}
+                    </button>
+                    <button
+                        onClick={() => generateLink(true)}
+                        className="bg-first text-white p-3 rounded-xl hover:brightness-75"
+                    >
+                        {text.complete_pay}
+                    </button>
+                </div>
+            </div>
         )
     }
-
-    const copyLink = () => {
-        if (response) navigator.clipboard.writeText(response.url)
-        toast.success(text.notif_copy);
-    }
-
-    const openPayPage = () => {
-        if (response) {
-            router.push(response.url);
-        }
-    }
-
-    return (
-        <div className="flex flex-col gap-5 justify-center items-center h-full bg-back">
-            <h1 className="text-4xl font-bold">{text.title}</h1>
-            <p className="text-center w-3/5 whitespace-pre-line">{text.subtitle}</p>
-            <input
-                type="number"
-                placeholder="Enter $ Amount"
-                className="p-3 text-center rounded-xl"
-                onChange={(e) => setPayAmount(Number(e.target.value))}
-            />
-            <button
-                className="p-3 rounded-xl bg-first text-white hover:brightness-75"
-                onClick={getLink}
-            >
-                {text.generate}
-            </button>
-            <div className="flex gap-3">
-                <button 
-                    disabled={!response}
-                    onClick={copyLink}
-                    className={classNames(
-                        "bg-first text-white p-3 rounded-xl",
-                        response ? "hover:cursor-grab" : "hover:cursor-not-allowed brightness-50"
-                    )}
-                >
-                    {`${text.copy_link}${response?.amount || 0}`}
-                </button>
-                <button
-                    disabled={!response}
-                    onClick={openPayPage}
-                    className={classNames(
-                        "bg-first text-white p-3 rounded-xl",
-                        response ? "hover:cursor-grab" : "hover:cursor-not-allowed brightness-50"
-                    )}
-                >
-                    {text.go_to_pay}
-                </button>
-            </div>
-        </div>
-    )
 }

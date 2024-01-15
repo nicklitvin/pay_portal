@@ -1,12 +1,12 @@
-import { getAmounts } from "@/lib/calculator";
+import { getTransactionFee } from "@/lib/calculator";
 import { stripe } from "@/lib/stripe";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
 export async function GET(req : Request) {
     try {
-        const valueRecieved = Number(req.url.split("?amount=")[1]);
-        const values = getAmounts(valueRecieved);
+        const amount = Number(req.url.split("?amount=")[1]);
+        const roundedAmount = Math.round(amount * 100) / 100;
 
         const lineItems : Stripe.Checkout.SessionCreateParams.LineItem[] = [
             {
@@ -16,7 +16,7 @@ export async function GET(req : Request) {
                     product_data: {
                         name: "Payment"
                     },
-                    unit_amount: values.amount * 100
+                    unit_amount: roundedAmount * 100
                 }
             },
             {
@@ -26,7 +26,7 @@ export async function GET(req : Request) {
                     product_data: {
                         name: "Transaction Fee"
                     },
-                    unit_amount: values.fee * 100
+                    unit_amount: getTransactionFee(roundedAmount) * 100
                 }
             }
         ]
@@ -40,7 +40,7 @@ export async function GET(req : Request) {
 
         return NextResponse.json({
             url: session.url,
-            amount: values.amount
+            amount: amount
         }, {status: 200})
 
     } catch (err) {
