@@ -25,7 +25,6 @@ const text = {
     `,
     generate_link: "Generate Link",
     complete_pay: "Complete Payment"
-
 }
 
 export default function Home() {
