@@ -9,22 +9,24 @@ const text = {
     notif_pay_error: "Did not complete payment",
     notif_input_not_valid: "Enter a valid amount",
     notif_input_not_enough: "Min. payment $0.20",
-    notif_loading: "Loading...",
+    notif_loading: "Processing amount from URL...",
     notif_link_copied: "Copied Link to Clipboard",
     notif_link_fail: "Server Error",
     notif_url_amount_error: "Error with url amount",
 
-    title: "Osipova Payment Portal",
+    title: "Stripe Payment Portal",
     subtitle: `
-        Enter a dollar amount to pay to Osipova Ballet Academy 
+        Enter a dollar amount to create a Stripe Checkout Page with a Transaction Fee 
         Min. payment is $0.20
         Transaction Fee is equal to 2.9% + $0.30
 
-        Generate Link will create a checkout page and copy the link to your clipboard
+        Generate Link will copy Stripe link to your clipboard (expires in 24hrs)
+        Create Simple Link will send users to this page and then to Stripe (recommended)
         Complete payment will redirect you to the checkout page
     `,
     generate_link: "Generate Link",
-    complete_pay: "Complete Payment"
+    complete_pay: "Complete Payment",
+    simple_link: "Create Simple Link"
 }
 
 export default function Home() {
@@ -114,6 +116,18 @@ export default function Home() {
         } catch (err) {}
     }
 
+    const generateSimpleLink = async() => {
+        const amountInfo = isPayAmountValid(payAmount);
+
+        if (!amountInfo.valid) 
+            return toast.error(amountInfo.message)
+
+        navigator.clipboard.writeText(
+            `${window.location.href}?amount=${payAmount}`
+        );
+        toast.success(text.notif_link_copied);
+    }
+
     if (redirecting) {
         return (
             <div className="bg-back w-full h-full justify-center items-center flex">
@@ -143,6 +157,12 @@ export default function Home() {
                         className="bg-first text-white p-3 rounded-xl hover:brightness-75"
                     >
                         {text.complete_pay}
+                    </button>
+                    <button
+                        onClick={() => generateSimpleLink()}
+                        className="bg-first text-white p-3 rounded-xl hover:brightness-75"
+                    >
+                        {text.simple_link}
                     </button>
                 </div>
             </div>
